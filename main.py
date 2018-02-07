@@ -72,7 +72,10 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+
+        # TODO: do we need a dim=1 argument?
+        soft = F.log_softmax(x)
+        return soft
 
 model = Net()
 if args.cuda:
