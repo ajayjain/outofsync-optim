@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 import argparse
+import sys
 
 import torch
 import torch.nn as nn
@@ -22,8 +23,8 @@ parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
-parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
-                    help='SGD momentum (default: 0.5)')
+parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
+                    help='SGD momentum (default: 0.9)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
@@ -73,8 +74,7 @@ class Net(nn.Module):
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
 
-        # TODO: do we need a dim=1 argument?
-        soft = F.log_softmax(x)
+        soft = F.log_softmax(x, dim=1)
         return soft
 
 model = Net()
@@ -83,8 +83,32 @@ if args.cuda:
 
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
+def get_gradients(optimizer):
+    gradient_map = {}
+
+    for group in optimizer.param_groups:
+        for p in group["params"]:
+            if p.grad is not None:
+                gradient_map[p] = p.grad.data.clone()
+
+    return gradient_map
+
+
+def set_gradients(optimizer, gradient_map):
+    for group in optimizer.param_groups:
+        for p in group["params"]:
+            if p.grad is not None:
+                p.grad.data.copy_(gradient_map[p])
+
+                # Debug: set gradient to zero
+                # p.grad.data.copy_(torch.zeros_like(p.grad.data))
+
+
 def train(epoch):
     model.train()
+
+    gradient_buf = None
+
     for batch_idx, (data, target) in enumerate(train_loader):
         if args.cuda:
             data, target = data.cuda(), target.cuda()
@@ -93,11 +117,28 @@ def train(epoch):
         output = model(data)
         loss = F.nll_loss(output, target)
         loss.backward()
-        optimizer.step()
+
+        if batch_idx == 0:
+            # First batch, initialize buffer
+            gradient_buf = get_gradients(optimizer)
+            # gradient_buf = {}
+        else:
+            # Save and swap model gradients with buffer, and step
+            new_buf = get_gradients(optimizer)
+            set_gradients(optimizer, gradient_buf)
+            gradient_buf = new_buf
+
+            optimizer.step()
+
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
+
+    # Update parameters with gradients from the last batch
+    if gradient_buf:
+        set_gradients(optimizer, gradient_buf)
+        optimizer.step()
 
 def test():
     model.eval()
