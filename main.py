@@ -27,6 +27,8 @@ parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.9)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
+parser.add_argument('--sync', action='store_true', default=False,
+                    help='disables delayed gradient application')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
@@ -118,17 +120,19 @@ def train(epoch):
         loss = F.nll_loss(output, target)
         loss.backward()
 
-        if batch_idx == 0:
-            # First batch, initialize buffer
-            gradient_buf = get_gradients(optimizer)
-            # gradient_buf = {}
-        else:
-            # Save and swap model gradients with buffer, and step
-            new_buf = get_gradients(optimizer)
-            set_gradients(optimizer, gradient_buf)
-            gradient_buf = new_buf
-
+        if args.sync:
             optimizer.step()
+        else:
+            if batch_idx == 0:
+                # First batch, initialize buffer
+                gradient_buf = get_gradients(optimizer)
+            else:
+                # Save and swap model gradients with buffer, and step
+                new_buf = get_gradients(optimizer)
+                set_gradients(optimizer, gradient_buf)
+                gradient_buf = new_buf
+
+                optimizer.step()
 
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
@@ -136,7 +140,7 @@ def train(epoch):
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
     # Update parameters with gradients from the last batch
-    if gradient_buf:
+    if not args.sync and gradient_buf:
         set_gradients(optimizer, gradient_buf)
         optimizer.step()
 
