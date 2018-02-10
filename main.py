@@ -13,6 +13,8 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 
+from utils import *
+
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
@@ -33,6 +35,8 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
+parser.add_argument('--task', type=str, default='MNIST', 
+                    help='which task to train, MNIST or CIFAR10')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -43,67 +47,19 @@ if args.cuda:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
+
 train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('data', train=True, download=True,
-                   transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ])),
+    get_training_set(args),
     batch_size=args.batch_size, shuffle=True, **kwargs)
 
 test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('data', train=False, transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ])),
+    get_test_set(args),
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
 
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, 10)
-
-    def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 320)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
-        x = self.fc2(x)
-
-        soft = F.log_softmax(x, dim=1)
-        return soft
-
-model = Net()
-if args.cuda:
-    model.cuda()
+model = get_model(args)
 
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
-
-def get_gradients(optimizer):
-    gradient_map = {}
-
-    for group in optimizer.param_groups:
-        for p in group["params"]:
-            if p.grad is not None:
-                gradient_map[p] = p.grad.data.clone()
-
-    return gradient_map
-
-
-def set_gradients(optimizer, gradient_map):
-    for group in optimizer.param_groups:
-        for p in group["params"]:
-            if p.grad is not None:
-                p.grad.data.copy_(gradient_map[p])
-
-                # Debug: set gradient to zero
-                # p.grad.data.copy_(torch.zeros_like(p.grad.data))
 
 
 def train(epoch):
