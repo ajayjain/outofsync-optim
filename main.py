@@ -73,8 +73,6 @@ model = get_model(args)
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
 
-print(len(train_loader))
-
 def train(epoch):
     model.train()
 
@@ -136,8 +134,8 @@ def test(epoch):
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
         writer.add_scalar('data/' + run_name + '/test_loss', 
-                            epoch * len(test_loader) + test_idx, 
-                            batch_loss
+                            batch_loss,
+                            epoch * len(test_loader) + test_idx
                             )
 
     test_loss /= len(test_loader.dataset)

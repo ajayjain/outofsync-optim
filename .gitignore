@@ -108,3 +108,4 @@ ENV/
 
 # tensorboard runs
 runs/*
+all_scalars.json
