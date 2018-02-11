@@ -27,10 +27,14 @@ parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.9)')
+
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
 parser.add_argument('--sync', action='store_true', default=False,
                     help='disables delayed gradient application')
+parser.add_argument('--data-parallel', action='store_true', default=False,
+                    help='whether to support multi-gpu with DataParallel')
+
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
@@ -40,13 +44,13 @@ parser.add_argument('--task', type=str, default='MNIST',
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
+
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
-
 
 train_loader = torch.utils.data.DataLoader(
     get_training_set(args),
@@ -55,7 +59,6 @@ train_loader = torch.utils.data.DataLoader(
 test_loader = torch.utils.data.DataLoader(
     get_test_set(args),
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
-
 
 model = get_model(args)
 
@@ -94,6 +97,7 @@ def train(epoch):
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
+            print_time_breakdown(model.times)
 
     # Update parameters with gradients from the last batch
     if not args.sync and gradient_buf:
@@ -119,7 +123,11 @@ def test():
         100. * correct / len(test_loader.dataset)))
 
 
-for epoch in range(1, args.epochs + 1):
-    train(epoch)
-    test()
+if __name__=="__main__":
+    if args.cuda:
+        print("Cuda available. Training with {} GPUs...", torch.cuda.device_count())
+
+    for epoch in range(1, args.epochs + 1):
+        train(epoch)
+        test()
 

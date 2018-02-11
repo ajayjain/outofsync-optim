@@ -1,6 +1,7 @@
 from torchvision import datasets, transforms
 
 from models import *
+from data_parallel import DataParallel
 
 def get_training_set(args):
     if args.task == 'MNIST':
@@ -53,11 +54,25 @@ def set_gradients(optimizer, gradient_map):
 
 def get_model(args):
     model = None
+
     if args.task == 'MNIST':
         model = BasicConv()
     elif args.task == 'CIFAR10':
         model = MobileNetV2()
 
+    if args.data_parallel:
+        model = DataParallel(model)
+
     if args.cuda:
         model.cuda()
-    return model 
+
+    return model
+
+
+def print_time_breakdown(times):
+    total = times["total"]
+
+    print("Time split:")
+    for key, time in times.items():
+        if key != "total":
+            print("  {}: {}%".format(key, time / total * 100))
