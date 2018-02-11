@@ -13,6 +13,8 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 
+from tensorboardX import SummaryWriter
+
 from utils import *
 
 # Training settings
@@ -37,6 +39,8 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--task', type=str, default='MNIST', 
                     help='which task to train, MNIST or CIFAR10')
+parser.add_argument('--run-name', type=str, default='', 
+                    help='name of the run for tensorboard logging')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -47,6 +51,11 @@ if args.cuda:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
+writer = SummaryWriter()
+
+run_name = args.run_name + '(' + args.task + ')'
+
+# Datasets
 
 train_loader = torch.utils.data.DataLoader(
     get_training_set(args),
@@ -57,10 +66,14 @@ test_loader = torch.utils.data.DataLoader(
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
 
+# Training & Testing
+
 model = get_model(args)
 
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
+
+print(len(train_loader))
 
 def train(epoch):
     model.train()
@@ -68,6 +81,7 @@ def train(epoch):
     gradient_buf = None
 
     for batch_idx, (data, target) in enumerate(train_loader):
+
         if args.cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data), Variable(target)
@@ -95,23 +109,36 @@ def train(epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
+        writer.add_scalar('data/' + run_name + '/training_loss', 
+                            loss.data[0], 
+                            epoch * len(train_loader) + batch_idx
+                            )
+
     # Update parameters with gradients from the last batch
     if not args.sync and gradient_buf:
         set_gradients(optimizer, gradient_buf)
         optimizer.step()
 
-def test():
+    print ('Train finished.')
+
+def test(epoch):
     model.eval()
     test_loss = 0
     correct = 0
-    for data, target in test_loader:
+    for test_idx, (data, target) in enumerate(test_loader):
         if args.cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        test_loss += F.nll_loss(output, target, size_average=False).data[0] # sum up batch loss
+        batch_loss = F.nll_loss(output, target, size_average=False).data[0] 
+        test_loss += batch_loss
         pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+
+        writer.add_scalar('data/' + run_name + '/test_loss', 
+                            epoch * len(test_loader) + test_idx, 
+                            batch_loss
+                            )
 
     test_loss /= len(test_loader.dataset)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
@@ -119,7 +146,10 @@ def test():
         100. * correct / len(test_loader.dataset)))
 
 
-for epoch in range(1, args.epochs + 1):
+for epoch in range(args.epochs):
     train(epoch)
-    test()
+    test(epoch)
 
+# export scalar data to JSON for external processing
+writer.export_scalars_to_json("./all_scalars.json")
+writer.close()
