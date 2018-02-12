@@ -88,11 +88,14 @@ class DelayedOptimizer():
         self.gradient_buf = []
 
     def step(self):
-        new_grad = get_gradients(self.optimizer)
-        self.gradient_buf.append(new_grad)
+        if self.delay > 0:
+            new_grad = get_gradients(self.optimizer)
+            self.gradient_buf.append(new_grad)
 
-        if len(self.gradient_buf) > self.delay:
-            self._apply_oldest()
+            if len(self.gradient_buf) > self.delay:
+                self._apply_oldest()
+        else:
+            self.optimizer.step()
 
     def zero_grad(self):
         self.optimizer.zero_grad()
@@ -169,7 +172,7 @@ def test(epoch):
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        batch_loss = F.nll_loss(output, target, size_average=False).data[0] 
+        batch_loss = F.nll_loss(output, target, size_average=False).data[0]
         test_loss += batch_loss
         pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
         batch_correct = pred.eq(target.data.view_as(pred)).cpu().sum()
@@ -197,9 +200,8 @@ for epoch in range(1, args.epochs + 1):
     test(epoch)
     train(epoch)
 
-    # Do a final test after the last train. 
-    if epoch == args.epochs:
-        test(epoch)
+# Do a final test after the last train.
+test(epoch)
 
 
 writer.close()
