@@ -31,6 +31,9 @@ parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.9)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
+parser.add_argument('--delay', default=1, type=int,
+                    help='the number of batches to buffer and replay - '
+                    'i.e. the gradient delay')
 parser.add_argument('--sync', action='store_true', default=False,
                     help='disables delayed gradient application')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
@@ -60,7 +63,6 @@ writer = SummaryWriter() if args.run_name is '' else SummaryWriter('runs/' + arg
 plot_name = args.task + '_' + args.plot_name
 
 # Datasets
-
 train_loader = torch.utils.data.DataLoader(
     get_training_set(args),
     batch_size=args.batch_size, shuffle=True, **kwargs)
@@ -70,47 +72,61 @@ test_loader = torch.utils.data.DataLoader(
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
 
+
+class DelayedOptimizer():
+    def __init__(self, optimizer, delay):
+        super(DelayedOptimizer, self).__init__()
+
+        self.delay = delay
+        self.optimizer = optimizer
+        self.gradient_buf = []
+
+    def step(self):
+        new_grad = get_gradients(self.optimizer)
+        self.gradient_buf.append(new_grad)
+
+        if len(self.gradient_buf) > self.delay:
+            self._apply_oldest()
+
+    def zero_grad(self):
+        self.optimizer.zero_grad()
+
+    def _apply_oldest(self):
+        # Replay the oldest gradient and update parameters
+        old_grad = self.gradient_buf.pop(0)
+        set_gradients(self.optimizer, old_grad)
+        self.optimizer.step()
+
+    def apply_all(self):
+        # Apply all updates from buffer
+        while self.gradient_buf:
+            self._apply_oldest()
+
+
 # Training & Testing
-
 model = get_model(args)
-
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
-
+delayed_optimizer = DelayedOptimizer(optimizer, args.delay)
 
 def train(epoch):
     model.train()
 
     # learning rate warmup
     if args.warmup == 'gradual':
-        set_learning_rate(optimizer, gradual_warmup(epoch, args.epochs, target_lr=args.lr))
+        set_learning_rate(delayed_optimizer.optimizer, gradual_warmup(epoch, args.epochs, target_lr=args.lr))
     elif args.warmup == 'constant':
-        set_learning_rate(optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
-
-    gradient_buf = None
+        set_learning_rate(delayed_optimizer.optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
 
     for batch_idx, (data, target) in enumerate(train_loader):
-
         if args.cuda:
             data, target = data.cuda(), target.cuda()
+
         data, target = Variable(data), Variable(target)
-        optimizer.zero_grad()
+        delayed_optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output, target)
         loss.backward()
-
-        if args.sync:
-            optimizer.step()
-        else:
-            if batch_idx == 0:
-                # First batch, initialize buffer
-                gradient_buf = get_gradients(optimizer)
-            else:
-                # Save and swap model gradients with buffer, and step
-                new_buf = get_gradients(optimizer)
-                set_gradients(optimizer, gradient_buf)
-                gradient_buf = new_buf
-
-                optimizer.step()
+        delayed_optimizer.step()
 
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
@@ -121,11 +137,6 @@ def train(epoch):
                             loss.data[0], 
                             epoch * len(train_loader) + batch_idx
                             )
-
-    # Update parameters with gradients from the last batch
-    if not args.sync and gradient_buf:
-        set_gradients(optimizer, gradient_buf)
-        optimizer.step()
 
     print ('Train finished.')
 
