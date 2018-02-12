@@ -21,6 +21,8 @@ for delay in range(10):
 
 			cmd = getCmd(epochs=30, learning_rate=lr, batch_size=bs, delay=delay, seed=seed)
 
+			print(cmd)
+			
 			subprocess.call(cmd, shell=True)
 
 			seed += 1
