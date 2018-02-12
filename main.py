@@ -13,6 +13,7 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 
+from data_parallel import DataParallel
 from utils import *
 
 # Training settings
@@ -64,6 +65,21 @@ model = get_model(args)
 
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
+class ModelWithLoss(nn.Module):
+    def __init__(self, module):
+        super(ModelWithLoss, self).__init__()
+        self.module = module
+
+    def forward(self, input, target):
+        output = self.module(input)
+
+        if target != None:
+            loss = F.nll_loss(output, target)
+            return output, loss
+        
+        return output
+
+loss = DataParallel(nn.NLLLoss())
 
 def train(epoch):
     model.train()
@@ -76,7 +92,7 @@ def train(epoch):
         data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = model(data)
-        loss = F.nll_loss(output, target)
+        _loss = loss(output, target)
         loss.backward()
 
         if args.sync:
@@ -98,6 +114,8 @@ def train(epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
             print_time_breakdown(model.times)
+            print("--")
+            print_time_breakdown(loss.times)
 
     # Update parameters with gradients from the last batch
     if not args.sync and gradient_buf:

@@ -60,8 +60,7 @@ def get_model(args):
     elif args.task == 'CIFAR10':
         model = MobileNetV2()
 
-    if args.data_parallel:
-        model = DataParallel(model)
+    model = DataParallel(model)
 
     if args.cuda:
         model.cuda()
@@ -76,3 +75,4 @@ def print_time_breakdown(times):
     for key, time in times.items():
         if key != "total":
             print("  {}: {}%".format(key, time / total * 100))
+
