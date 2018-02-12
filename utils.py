@@ -61,3 +61,17 @@ def get_model(args):
     if args.cuda:
         model.cuda()
     return model 
+
+def set_learning_rate(optimizer, lr):
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
+def gradual_warmup(current_epoch, max_epochs, target_lr=0.1, start_lr=0.01):
+    return ((target_lr - start_lr) / max_epochs) * current_epoch + start_lr
+
+def constant_warmup(current_epoch, jump_after=4, target_lr=0.1, start_lr=0.01):
+    if current_epoch >= jump_after:
+        return target_lr
+    else:
+        return start_lr

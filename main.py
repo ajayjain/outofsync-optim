@@ -41,6 +41,10 @@ parser.add_argument('--task', type=str, default='MNIST',
                     help='which task to train, MNIST or CIFAR10')
 parser.add_argument('--run-name', type=str, default='', 
                     help='name of the run for tensorboard logging')
+parser.add_argument('--plot-name', type=str, default='',
+                    help='name of the plot in which to store the results')
+parser.add_argument('--warmup', type=str, default='none',
+                    help='learning rate warmup method to use, gradual or constant')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -51,9 +55,9 @@ if args.cuda:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-writer = SummaryWriter()
+writer = SummaryWriter() if args.run_name is '' else SummaryWriter('runs/' + args.run_name)
 
-run_name = args.run_name + '(' + args.task + ')'
+plot_name = args.task + '_' + args.plot_name
 
 # Datasets
 
@@ -75,6 +79,12 @@ optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
 def train(epoch):
     model.train()
+
+    # learning rate warmup
+    if args.warmup == 'gradual':
+        set_learning_rate(optimizer, gradual_warmup(epoch, args.epochs, target_lr=args.lr))
+    elif args.warmup == 'constant':
+        set_learning_rate(optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
 
     gradient_buf = None
 
@@ -107,7 +117,7 @@ def train(epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
-        writer.add_scalar('data/' + run_name + '/training_loss', 
+        writer.add_scalar('data/' + plot_name + '/training_loss', 
                             loss.data[0], 
                             epoch * len(train_loader) + batch_idx
                             )
@@ -131,23 +141,31 @@ def test(epoch):
         batch_loss = F.nll_loss(output, target, size_average=False).data[0] 
         test_loss += batch_loss
         pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
-        correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+        batch_correct = pred.eq(target.data.view_as(pred)).cpu().sum()
+        correct += batch_correct
 
-        writer.add_scalar('data/' + run_name + '/test_loss', 
-                            batch_loss,
+        writer.add_scalar('data/' + plot_name + '/test_loss', 
+                            batch_loss / args.test_batch_size,
                             epoch * len(test_loader) + test_idx
                             )
 
+        writer.add_scalar('data/' + plot_name + '/test_accuracy', 
+                            100. * batch_correct / args.test_batch_size,
+                            epoch * len(test_loader) + test_idx
+                            )
+
+
     test_loss /= len(test_loader.dataset)
+    test_accuracy = 100. * correct / len(test_loader.dataset)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        test_accuracy))
+    return test_accuracy
 
 
 for epoch in range(args.epochs):
     train(epoch)
     test(epoch)
 
-# export scalar data to JSON for external processing
-writer.export_scalars_to_json("./all_scalars.json")
 writer.close()
+
