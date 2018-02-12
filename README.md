@@ -18,7 +18,7 @@ run `tensorboard --logdir runs`
 
 This adds a run called `MNIST_0.01_1000_0` (learning rate, batch size, sync) and will show up as that line on the tensorboard plot titled `data/test`.
 
-### Using `gradient_sweep.py`
+### Using `batch_sweep.py`
 
 `python batch-sweep.py --max-batch-size=1000 --sweep-increment=100`
 
@@ -39,3 +39,5 @@ This adds a new plot for visualizing error of different batch sizes, sweeping by
 * then generate the heatmap for just sync, and again for delayed
 
 * LR vs. test accuracy, from 10^-6 to 10^0
+
+* sweep from 128 to 2048

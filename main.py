@@ -69,7 +69,7 @@ train_loader = torch.utils.data.DataLoader(
 
 test_loader = torch.utils.data.DataLoader(
     get_test_set(args),
-    batch_size=args.test_batch_size, shuffle=True, **kwargs) ## TODO: what exactly is this shuffling doing? 
+    batch_size=args.test_batch_size, shuffle=True, **kwargs) 
 
 
 # Logging
@@ -143,6 +143,7 @@ def train(epoch):
     elif args.warmup == 'constant':
         set_learning_rate(delayed_optimizer.optimizer, constant_warmup(epoch, target_lr=args.lr))
 
+    train_loss = 0
     train_correct = 0
 
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -156,20 +157,21 @@ def train(epoch):
         loss.backward()
         delayed_optimizer.step()
 
-        # Compute training accuracy
+        # Compute training accuracy & loss
         pred = output.data.max(1, keepdim=True)[1]
         train_correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+        train_loss += loss.data[0]
 
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
-        # Log train loss per-batch
-        log_scalar('train_loss', 
-                    epoch * len(train_loader) + batch_idx,
-                    loss.data[0]
-                    )
+
+
+    # Log average train loss over the epoch
+    train_loss /= len(train_loader.dataset)
+    log_scalar('train_loss', epoch, train_loss)
 
     # Log average train accuracy over the epoch
     train_accuracy = 100. * train_correct / len(train_loader.dataset)
@@ -205,8 +207,6 @@ def test(epoch):
 
     log_scalar('test_accuracy', epoch, test_accuracy)
 
-    return test_accuracy
-
 
 for epoch in range(1, args.epochs + 1):
 
@@ -215,7 +215,7 @@ for epoch in range(1, args.epochs + 1):
     train(epoch)
 
 # Do a final test after the last train.
-test(epoch)
+test(args.epochs + 1)
 
 
 writer.close()
