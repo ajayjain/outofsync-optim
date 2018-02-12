@@ -1,6 +1,9 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+# TODO: use LeNet instead from original convnet paper
+# make sure baseline is above 99%
+
 class BasicConv(nn.Module):
     def __init__(self):
         super(BasicConv, self).__init__()

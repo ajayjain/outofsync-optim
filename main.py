@@ -69,7 +69,7 @@ train_loader = torch.utils.data.DataLoader(
 
 test_loader = torch.utils.data.DataLoader(
     get_test_set(args),
-    batch_size=args.test_batch_size, shuffle=True, **kwargs)
+    batch_size=args.test_batch_size, shuffle=True, **kwargs) ## what exactly is this shuffling doing? 
 
 
 
@@ -112,10 +112,12 @@ def train(epoch):
     model.train()
 
     # learning rate warmup
+    # TODO: skip the warmup
     if args.warmup == 'gradual':
         set_learning_rate(delayed_optimizer.optimizer, gradual_warmup(epoch, args.epochs, target_lr=args.lr))
     elif args.warmup == 'constant':
         set_learning_rate(delayed_optimizer.optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
+        set_learning_rate(optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
 
     for batch_idx, (data, target) in enumerate(train_loader):
         if args.cuda:
@@ -137,6 +139,9 @@ def train(epoch):
                             loss.data[0], 
                             epoch * len(train_loader) + batch_idx
                             )
+
+        # TODO: add training accuracy to logs
+        # TODO: save the average accuracy over whole batch, & average loss 
 
     print ('Train finished.')
 
@@ -174,7 +179,10 @@ def test(epoch):
     return test_accuracy
 
 
+# TODO: sync batch sizes between test and train
+
 for epoch in range(args.epochs):
+    # TODO: switch these; then run one final test
     train(epoch)
     test(epoch)
 
