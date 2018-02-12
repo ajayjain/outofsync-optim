@@ -4,6 +4,8 @@
 from __future__ import print_function
 import argparse
 import sys
+import datetime 
+import os
 
 import torch
 import torch.nn as nn
@@ -42,9 +44,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--task', type=str, default='MNIST', 
                     help='which task to train, MNIST or CIFAR10')
-parser.add_argument('--run-name', type=str, default='', 
-                    help='name of the run for tensorboard logging')
-parser.add_argument('--plot-name', type=str, default='',
+parser.add_argument('--tensorboard-plot', type=str, default='',
                     help='name of the plot in which to store the results')
 parser.add_argument('--warmup', type=str, default='none',
                     help='learning rate warmup method to use, gradual or constant')
@@ -58,9 +58,9 @@ if args.cuda:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-writer = SummaryWriter() if args.run_name is '' else SummaryWriter('runs/' + args.run_name)
+run_name = args.task + '_' + str(args.lr) + '_' + str(args.batch_size) + '_' + str(args.delay)
 
-plot_name = args.task + '_' + args.plot_name
+writer = SummaryWriter('runs/' + run_name)
 
 # Datasets
 train_loader = torch.utils.data.DataLoader(
@@ -74,9 +74,23 @@ test_loader = torch.utils.data.DataLoader(
 
 # Logging
 
-def log_scalar(name, y, x):
+## Generate runs-csv folder if not existent
+os.makedirs('runs-csv', exist_ok=True)
+
+## Generate new log folder on each run of this file
+if args.log_output:
+    os.makedirs('runs-csv/' + run_name, exist_ok=True)
+    open('runs-csv/' + run_name + '/train_accuracy', 'w').close()
+    open('runs-csv/' + run_name + '/train_loss', 'w').close()
+    open('runs-csv/' + run_name + '/test_accuracy', 'w').close()
+    open('runs-csv/' + run_name + '/test_loss', 'w').close()
+
+
+def log_scalar(name, x, y):
     if args.log_output:
-        writer.add_scalar(name, y, x)
+        writer.add_scalar(args.tensorboard_plot + '/' + name, y, x)
+        with open('runs-csv/' + run_name + '/' + name, 'a') as f:
+            f.write(str(x) + ',' + str(y) + '\n')
 
 # Training & Testing
 class DelayedOptimizer():
@@ -152,14 +166,14 @@ def train(epoch):
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
         # Log train loss per-batch
-        log_scalar('data/' + plot_name + '/training_loss', 
-                            loss.data[0], 
-                            epoch * len(train_loader) + batch_idx
-                            )
+        log_scalar('train_loss', 
+                    epoch * len(train_loader) + batch_idx,
+                    loss.data[0]
+                    )
 
     # Log average train accuracy over the epoch
     train_accuracy = 100. * train_correct / len(train_loader.dataset)
-    log_scalar('data/' + plot_name + '/training_accuracy', train_accuracy, epoch)
+    log_scalar('train_accuracy', epoch, train_accuracy)
 
     print ('Train finished.')
 
@@ -187,9 +201,9 @@ def test(epoch):
         test_loss, correct, len(test_loader.dataset),
         test_accuracy))
 
-    log_scalar('data/' + plot_name + '/test_loss', test_loss, epoch)
+    log_scalar('test_loss', epoch, test_loss)
 
-    log_scalar('data/' + plot_name + '/test_accuracy', test_accuracy, epoch)
+    log_scalar('test_accuracy', epoch, test_accuracy)
 
     return test_accuracy
 

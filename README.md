@@ -14,9 +14,9 @@ run `tensorboard --logdir runs`
 
 ### Using `main.py`
 
-`python main.py --run-name=batch1000_sync --plot-name=different_batch_sizes --batch-size=1000 --lr=0.1 --warmup=constant --sync`
+`python main.py --tensorboard-plot=test --log-output --batch-size=1000`
 
-This adds a line labeled `batch1000_sync` to the plot `different_batch_sizes`, with learning rate `0.1` and warmup method `constant`.
+This adds a run called `MNIST_0.01_1000_0` (learning rate, batch size, sync) and will show up as that line on the tensorboard plot titled `data/test`.
 
 ### Using `gradient_sweep.py`
 
