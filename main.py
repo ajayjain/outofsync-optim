@@ -67,7 +67,7 @@ train_loader = torch.utils.data.DataLoader(
 
 test_loader = torch.utils.data.DataLoader(
     get_test_set(args),
-    batch_size=args.test_batch_size, shuffle=True, **kwargs)
+    batch_size=args.test_batch_size, shuffle=True, **kwargs) ## what exactly is this shuffling doing? 
 
 
 # Training & Testing
@@ -81,11 +81,13 @@ def train(epoch):
     model.train()
 
     # learning rate warmup
+    # TODO: skip the warmup
     if args.warmup == 'gradual':
         set_learning_rate(optimizer, gradual_warmup(epoch, args.epochs, target_lr=args.lr))
     elif args.warmup == 'constant':
         set_learning_rate(optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
 
+    # TODO: place this outside the training loop, preferably inside the optimizer
     gradient_buf = None
 
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -121,6 +123,9 @@ def train(epoch):
                             loss.data[0], 
                             epoch * len(train_loader) + batch_idx
                             )
+
+        # TODO: add training accuracy to logs
+        # TODO: save the average accuracy over whole batch, & average loss 
 
     # Update parameters with gradients from the last batch
     if not args.sync and gradient_buf:
@@ -163,7 +168,10 @@ def test(epoch):
     return test_accuracy
 
 
+# TODO: sync batch sizes between test and train
+
 for epoch in range(args.epochs):
+    # TODO: switch these; then run one final test
     train(epoch)
     test(epoch)
 
