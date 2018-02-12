@@ -6,9 +6,9 @@ def get_training_set(args):
     if args.task == 'MNIST':
         return datasets.MNIST('data', train=True, download=True,
                    transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ]))
+                       transforms.Resize((32, 32)),
+                       transforms.ToTensor()
+                    ]))
     elif args.task == 'CIFAR10': 
         return datasets.CIFAR10('data', train=True, download=True, 
                     transform=transforms.Compose([
@@ -21,9 +21,9 @@ def get_training_set(args):
 def get_test_set(args): 
     if args.task == 'MNIST':
         return datasets.MNIST('data', train=False, transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ]))
+                        transforms.Resize((32, 32)),
+                        transforms.ToTensor()
+                    ]))
     elif args.task == 'CIFAR10':
         return datasets.CIFAR10('data', train=False, download=True, 
                     transform=transforms.Compose([
@@ -51,15 +51,13 @@ def set_gradients(optimizer, gradient_map):
                 # Debug: set gradient to zero
                 # p.grad.data.copy_(torch.zeros_like(p.grad.data))
 
-def get_model(args):
+def get_model(task):
     model = None
-    if args.task == 'MNIST':
-        model = BasicConv()
-    elif args.task == 'CIFAR10':
+    if task == 'MNIST':
+        model = LeNet5()
+    elif task == 'CIFAR10':
         model = MobileNetV2()
-
-    if args.cuda:
-        model.cuda()
+        
     return model 
 
 def set_learning_rate(optimizer, lr):
@@ -67,8 +65,8 @@ def set_learning_rate(optimizer, lr):
         param_group['lr'] = lr
 
 
-def gradual_warmup(current_epoch, max_epochs, target_lr=0.1, start_lr=0.01):
-    return ((target_lr - start_lr) / max_epochs) * current_epoch + start_lr
+def gradual_warmup(current_epoch, end_epoch=5, target_lr=0.1, start_lr=0.01):
+    return ((target_lr - start_lr) / end_epoch) * current_epoch + start_lr
 
 def constant_warmup(current_epoch, jump_after=4, target_lr=0.1, start_lr=0.01):
     if current_epoch >= jump_after:

@@ -24,3 +24,18 @@ This adds a line labeled `batch1000_sync` to the plot `different_batch_sizes`, w
 
 This adds a new plot for visualizing error of different batch sizes, sweeping by increments of 100 up to 1000.
 
+# experiments
+
+* x-axis batch size, y-axis learning rate, heatmap based on accuracy
+
+* higher momentum 
+
+* ensure >99% accuracy for a few different batch sizes; tweak learning rates to make it work
+* make epochs constant; x-axis scales should be the same
+* for the test set, just output the average over the whole test set
+* first try large batches with high learning rates, cut it down until it starts working
+* if after n epochs it drops, later on, try dropping learning rates later on
+* target 99 on everything, lock in those learning rates 
+* then generate the heatmap for just sync, and again for delayed
+
+* LR vs. test accuracy, from 10^-6 to 10^0

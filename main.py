@@ -31,11 +31,11 @@ parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.9)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
-parser.add_argument('--delay', default=1, type=int,
+parser.add_argument('--delay', default=0, type=int,
                     help='the number of batches to buffer and replay - '
                     'i.e. the gradient delay')
-parser.add_argument('--sync', action='store_true', default=False,
-                    help='disables delayed gradient application')
+parser.add_argument('--log-output', action='store_true', default=False,
+                    help='logs output to tensorboard and CSV')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
@@ -69,10 +69,16 @@ train_loader = torch.utils.data.DataLoader(
 
 test_loader = torch.utils.data.DataLoader(
     get_test_set(args),
-    batch_size=args.test_batch_size, shuffle=True, **kwargs) ## what exactly is this shuffling doing? 
+    batch_size=args.test_batch_size, shuffle=True, **kwargs) ## TODO: what exactly is this shuffling doing? 
 
 
+# Logging
 
+def log_scalar(name, y, x):
+    if args.log_output:
+        writer.add_scalar(name, y, x)
+
+# Training & Testing
 class DelayedOptimizer():
     def __init__(self, optimizer, delay):
         super(DelayedOptimizer, self).__init__()
@@ -103,21 +109,24 @@ class DelayedOptimizer():
             self._apply_oldest()
 
 
-# Training & Testing
-model = get_model(args)
+model = get_model(args.task)
+if args.cuda:
+    model.cuda()
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 delayed_optimizer = DelayedOptimizer(optimizer, args.delay)
+
+# Train & test
 
 def train(epoch):
     model.train()
 
-    # learning rate warmup
-    # TODO: skip the warmup
+    # Optional: learning rate warmup
     if args.warmup == 'gradual':
-        set_learning_rate(delayed_optimizer.optimizer, gradual_warmup(epoch, args.epochs, target_lr=args.lr))
+        set_learning_rate(delayed_optimizer.optimizer, gradual_warmup(epoch, target_lr=args.lr))
     elif args.warmup == 'constant':
-        set_learning_rate(delayed_optimizer.optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
-        set_learning_rate(optimizer, constant_warmup(epoch, args.epochs, target_lr=args.lr))
+        set_learning_rate(delayed_optimizer.optimizer, constant_warmup(epoch, target_lr=args.lr))
+
+    train_correct = 0
 
     for batch_idx, (data, target) in enumerate(train_loader):
         if args.cuda:
@@ -130,18 +139,24 @@ def train(epoch):
         loss.backward()
         delayed_optimizer.step()
 
+        # Compute training accuracy
+        pred = output.data.max(1, keepdim=True)[1]
+        train_correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
-        writer.add_scalar('data/' + plot_name + '/training_loss', 
+        # Log train loss per-batch
+        log_scalar('data/' + plot_name + '/training_loss', 
                             loss.data[0], 
                             epoch * len(train_loader) + batch_idx
                             )
 
-        # TODO: add training accuracy to logs
-        # TODO: save the average accuracy over whole batch, & average loss 
+    # Log average train accuracy over the epoch
+    train_accuracy = 100. * train_correct / len(train_loader.dataset)
+    log_scalar('data/' + plot_name + '/training_accuracy', train_accuracy, epoch)
 
     print ('Train finished.')
 
@@ -160,31 +175,32 @@ def test(epoch):
         batch_correct = pred.eq(target.data.view_as(pred)).cpu().sum()
         correct += batch_correct
 
-        writer.add_scalar('data/' + plot_name + '/test_loss', 
-                            batch_loss / args.test_batch_size,
-                            epoch * len(test_loader) + test_idx
-                            )
-
-        writer.add_scalar('data/' + plot_name + '/test_accuracy', 
-                            100. * batch_correct / args.test_batch_size,
-                            epoch * len(test_loader) + test_idx
-                            )
 
 
     test_loss /= len(test_loader.dataset)
     test_accuracy = 100. * correct / len(test_loader.dataset)
+
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         test_accuracy))
+
+    log_scalar('data/' + plot_name + '/test_loss', test_loss, epoch)
+
+    log_scalar('data/' + plot_name + '/test_accuracy', test_accuracy, epoch)
+
     return test_accuracy
 
 
-# TODO: sync batch sizes between test and train
+for epoch in range(1, args.epochs + 1):
 
-for epoch in range(args.epochs):
-    # TODO: switch these; then run one final test
-    train(epoch)
+    # Do one test without any training, to get a baseline.
     test(epoch)
+    train(epoch)
+
+    # Do a final test after the last train. 
+    if epoch == args.epochs:
+        test(epoch)
+
 
 writer.close()
 
