@@ -65,11 +65,11 @@ def set_learning_rate(optimizer, lr):
         param_group['lr'] = lr
 
 
-def gradual_warmup(current_epoch, end_epoch=5, target_lr=0.1, start_lr=0.01):
-    return ((target_lr - start_lr) / end_epoch) * current_epoch + start_lr
+def gradual_warmup(current_epoch, end_epoch=5, target_lr=0.1, start_lr=0.001):
+    return ((target_lr - min(target_lr, start_lr)) / end_epoch) * current_epoch + start_lr
 
-def constant_warmup(current_epoch, jump_after=4, target_lr=0.1, start_lr=0.01):
+def constant_warmup(current_epoch, jump_after=5, target_lr=0.1, start_lr=0.001):
     if current_epoch >= jump_after:
         return target_lr
     else:
-        return start_lr
+        return min(target_lr, start_lr)

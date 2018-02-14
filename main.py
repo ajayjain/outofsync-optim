@@ -48,6 +48,7 @@ parser.add_argument('--tensorboard-plot', type=str, default='',
                     help='name of the plot in which to store the results')
 parser.add_argument('--warmup', type=str, default='none',
                     help='learning rate warmup method to use, gradual or constant')
+
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -58,7 +59,7 @@ if args.cuda:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-run_name = args.task + '_' + str(args.lr) + '_' + str(args.batch_size) + '_' + str(args.delay)
+run_name = args.task + '_' + str(args.lr) + '_' + str(args.batch_size) + '_' + str(args.delay) + '_' + str(args.warmup) + '_' + str(args.momentum)
 
 writer = SummaryWriter('runs/' + run_name)
 
