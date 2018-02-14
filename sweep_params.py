@@ -44,14 +44,14 @@ class ProcessQueue():
 
 pq = ProcessQueue(10)
 
-for delay in [0, 1, 2, 4, 6, 8]:
-	for lr_exponent in range(-12, -5):
+for delay in [32, 64]:
+	for lr_exponent in range(-13, -6):
 		lr = 2 ** lr_exponent 
 
-		for batch_exponent in range(6, 11):
+		for batch_exponent in range(6, 8):
 			bs = 2 ** batch_exponent
 
-			cmd = getCmd(epochs=30, learning_rate=lr, batch_size=bs, delay=delay, seed=seed, momentum=0.9, optimizer="sgd")
+			cmd = getCmd(epochs=30, learning_rate=lr, batch_size=bs, delay=delay, seed=seed, momentum=0.9, optimizer="adam")
 
 			print(cmd)
 
