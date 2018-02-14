@@ -5,8 +5,9 @@ from __future__ import print_function
 import subprocess
 import numpy as np
 
-def getCmd(epochs, learning_rate, batch_size, delay, seed, momentum):
-	return 'python main.py --epochs={} --lr={} --batch-size={} --delay={} --seed={} --momentum={} --tensorboard-plot=grid_search --log-output'.format(epochs, learning_rate, batch_size, delay, seed, momentum)
+
+def getCmd(epochs, learning_rate, batch_size, delay, seed, momentum, optimizer):
+	return 'python main.py --epochs={} --lr={} --batch-size={} --delay={} --seed={} --momentum={} --optimizer={} --tensorboard-plot=grid_search --log-output'.format(epochs, learning_rate, batch_size, delay, seed, momentum, optimizer)
 
 
 # seed = 1
@@ -47,7 +48,7 @@ for delay in [0, 1, 2, 4, 6, 8]:
 		for batch_exponent in range(6, 11):
 			bs = 2 ** batch_exponent
 
-			cmd = getCmd(epochs=30, learning_rate=lr, batch_size=bs, delay=delay, seed=seed, momentum=0.9)
+			cmd = getCmd(epochs=30, learning_rate=lr, batch_size=bs, delay=delay, seed=seed, momentum=0.9, optimizer="sgd")
 
 			print(cmd)
 

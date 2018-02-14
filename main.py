@@ -38,6 +38,8 @@ parser.add_argument('--delay', default=0, type=int,
                     'i.e. the gradient delay')
 parser.add_argument('--log-output', action='store_true', default=False,
                     help='logs output to tensorboard and CSV')
+parser.add_argument('--optimizer', type=str, default="sgd",
+                    help='select optimizer. Defaults to SGD')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
@@ -59,7 +61,7 @@ if args.cuda:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-run_name = args.task + '_' + str(args.lr) + '_' + str(args.batch_size) + '_' + str(args.delay) + '_' + str(args.warmup) + '_' + str(args.momentum)
+run_name = args.task + '_' + str(args.lr) + '_' + str(args.batch_size) + '_' + str(args.delay) + '_' + str(args.warmup) + '_' + str(args.momentum) + '_' + str(args.optimizer)
 
 writer = SummaryWriter('runs/' + run_name)
 
@@ -130,7 +132,10 @@ class DelayedOptimizer():
 model = get_model(args.task)
 if args.cuda:
     model.cuda()
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+if args.optimizer == "adam":
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+else:
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 delayed_optimizer = DelayedOptimizer(optimizer, args.delay)
 
 # Train & test
