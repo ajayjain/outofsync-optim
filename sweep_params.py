@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import subprocess
 import numpy as np
+import time
 
 
 def getCmd(epochs, learning_rate, batch_size, delay, seed, momentum, optimizer):
@@ -38,6 +39,8 @@ class ProcessQueue():
 				if p.poll() is not None:
 					del self.wait_queue[i]
 					self._run_next()
+
+			time.sleep(0.5)
 
 pq = ProcessQueue(10)
 
