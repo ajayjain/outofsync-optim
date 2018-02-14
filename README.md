@@ -24,20 +24,10 @@ This adds a run called `MNIST_0.01_1000_0` (learning rate, batch size, sync) and
 
 This adds a new plot for visualizing error of different batch sizes, sweeping by increments of 100 up to 1000.
 
-# experiments
+### ICLR 2018 Workshop paper & raw data
 
-* x-axis batch size, y-axis learning rate, heatmap based on accuracy
+[Paper](https://www.dropbox.com/s/6kf3ogwoxo2skh2/final_paper.pdf?dl=0) submitted for the ICLR 2018 Workshop track. 
 
-* higher momentum 
+[Raw CSV Data](https://www.dropbox.com/s/skgwbqp4iwvgbn7/runs-csv.zip?dl=0). Unzip the file, and use the `Generate plots from runs.ipynb` iPython notebook to parse and visualize the data.
 
-* ensure >99% accuracy for a few different batch sizes; tweak learning rates to make it work
-* make epochs constant; x-axis scales should be the same
-* for the test set, just output the average over the whole test set
-* first try large batches with high learning rates, cut it down until it starts working
-* if after n epochs it drops, later on, try dropping learning rates later on
-* target 99 on everything, lock in those learning rates 
-* then generate the heatmap for just sync, and again for delayed
-
-* LR vs. test accuracy, from 10^-6 to 10^0
-
-* sweep from 128 to 2048
+[TFEvents Data](https://www.dropbox.com/s/lfj7rk3dxsjvsfz/runs.zip?dl=0). Unzip the file, and run `tensorboard --logdir runs` to see training and test loss & accuracy across epochs. 
