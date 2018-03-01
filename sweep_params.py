@@ -6,14 +6,17 @@ import subprocess
 import numpy as np
 import time
 
-
-def getCmd(epochs, learning_rate, batch_size, delay, seed, momentum, optimizer):
-	return 'python main.py --epochs={} --lr={} --batch-size={} --delay={} --seed={} --momentum={} --optimizer={} --tensorboard-plot=grid_search --log-output'.format(epochs, learning_rate, batch_size, delay, seed, momentum, optimizer)
+from Run import Run
 
 
-# seed = 1
-# seed = 500
-seed = 10000
+seed = 1
+epochs = 90
+delays = [0, 1]
+# learning_rates = [2 ** exp for exp in range(-13, -5)]
+learning_rates = [2 ** exp for exp in range(-5, -2)]
+batch_sizes = [2 ** exp for exp in range(6, 11)]
+momenta = [0.9, np.sqrt(0.9)]
+
 
 class ProcessQueue():
 	def __init__(self, num_procs):
@@ -44,19 +47,28 @@ class ProcessQueue():
 
 pq = ProcessQueue(10)
 
-for delay in [32, 64]:
-	for lr_exponent in range(-13, -6):
-		lr = 2 ** lr_exponent 
 
-		for batch_exponent in range(6, 8):
-			bs = 2 ** batch_exponent
+for delay in delays:
+	for mom in momenta: 
+		for lr in learning_rates:
+			for bs in batch_sizes:
 
-			cmd = getCmd(epochs=30, learning_rate=lr, batch_size=bs, delay=delay, seed=seed, momentum=0.9, optimizer="adam")
+				run = Run(
+					epochs = epochs,
+					learning_rate = lr,
+					batch_size = bs,
+					delay = delay,
+					seed = seed,
+					momentum = mom,
+					optimizer = 'sgd'
+					)
 
-			print(cmd)
+				cmd = run.to_shell()
 
-			pq.queue(cmd)
+				print(cmd)
 
-			seed += 1
+				pq.queue(cmd)
+
+				seed += 1
 
 pq.wait()

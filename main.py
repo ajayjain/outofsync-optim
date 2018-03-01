@@ -6,6 +6,7 @@ import argparse
 import sys
 import datetime 
 import os
+import shutil
 
 import torch
 import torch.nn as nn
@@ -18,6 +19,7 @@ from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 
 from utils import *
+from Run import Run
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -61,7 +63,17 @@ if args.cuda:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
-run_name = args.task + '_' + str(args.lr) + '_' + str(args.batch_size) + '_' + str(args.delay) + '_' + str(args.warmup) + '_' + str(args.momentum) + '_' + str(args.optimizer)
+run = Run(
+    task = args.task,
+    learning_rate = args.lr,
+    batch_size = args.batch_size,
+    delay = args.delay,
+    warmup = args.warmup,
+    momentum = args.momentum,
+    optimizer = args.optimizer
+    )
+
+run_name = run.to_filename()
 
 writer = SummaryWriter('runs/' + run_name)
 
@@ -82,7 +94,9 @@ os.makedirs('runs-csv', exist_ok=True)
 
 ## Generate new log folder on each run of this file
 if args.log_output:
-    os.makedirs('runs-csv/' + run_name, exist_ok=True)
+    if os.path.exists('runs-csv/' + run_name):
+        shutil.rmtree('runs-csv/' + run_name)
+    os.makedirs('runs-csv/' + run_name)
     open('runs-csv/' + run_name + '/train_accuracy', 'w').close()
     open('runs-csv/' + run_name + '/train_loss', 'w').close()
     open('runs-csv/' + run_name + '/test_accuracy', 'w').close()

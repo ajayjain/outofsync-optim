@@ -110,3 +110,12 @@ ENV/
 runs/*
 runs-csv/*
 all_scalars.json
+
+# images
+frames/
+out.mp4
+
+# data
+runs_df.csv
+runs-csv.zip
+runs.zip
